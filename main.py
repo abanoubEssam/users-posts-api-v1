@@ -48,6 +48,20 @@ db_dependency = Annotated[Session, Depends(get_db)]
 # @app.on_event("startup")
 # async def startup_event():
 #     print("Server StartUp")
+@app.put('/super-admin', status_code=status.HTTP_201_CREATED)
+async def create_super_admin(db: db_dependency):
+    super_admin_data = {
+        "email": "super.admin@arrow.com",
+        "password": "super123",
+        "role": "super_admin"
+    }
+    check_user = db.query(models.User).filter(models.User.email == super_admin_data['email']).first()
+    if check_user:
+        return {"exists": True}
+    db_user = models.User(**super_admin_data)
+    db_user.password = get_hashed_password(db_user.password)
+    db.add(db_user)
+    db.commit()
 
 
 # @app.post('/users', dependencies=[Depends(JWTBearer())], status_code=status.HTTP_201_CREATED)
