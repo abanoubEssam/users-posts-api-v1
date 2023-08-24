@@ -18,17 +18,6 @@ class User(Base):
     conversations = relationship("Conversation", back_populates="owner")
 
 
-# class Post(Base):
-#     __tablename__ = 'posts'
-#
-#     id = Column(Integer, primary_key=True, index=True)
-#     title = Column(String(50))
-#     content = Column(String(100))
-#     user_id = Column(Integer)
-#     created_date = Column(DateTime, default=datetime.datetime.utcnow)
-#     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-
 class Conversation(Base):
     __tablename__ = 'conversations'
 

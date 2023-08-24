@@ -16,12 +16,6 @@ models.Base.metadata.create_all(bind=engine)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-class PostBase(BaseModel):
-    title: str
-    content: str
-    user_id: int
-
-
 class UserBase(BaseModel):
     email: str
     password: str
@@ -31,6 +25,11 @@ class UserBase(BaseModel):
 class UserLoginDto(BaseModel):
     email: str
     password: str
+
+
+class CreateMessageDto(BaseModel):
+    message: str
+    creative_mode: bool = None
 
 
 def get_db():
@@ -70,6 +69,10 @@ async def create_user(token: Annotated[str, Depends(oauth2_scheme)], user: UserB
     print("token: " + str(token))
     current_user = decode_jwt(token)
     print(current_user)
+
+    current_user_db = db.query(models.User).filter(models.User.email == current_user.email).first()
+    if current_user_db is None or current_user_db.role != "super_admin":
+        raise HTTPException(status_code=403, detail="not allowed")
     check_user = db.query(models.User).filter(models.User.email == user.email).first()
     if check_user:
         raise HTTPException(status_code=409, detail="email taken")
@@ -119,7 +122,6 @@ async def login(user: UserLoginDto, db: db_dependency):
 @app.get('/conversations', dependencies=[Depends(JWTBearer())], status_code=status.HTTP_201_CREATED)
 async def find_conversations(token: Annotated[str, Depends(oauth2_scheme)], db: db_dependency):
     current_user = decode_jwt(token)
-    print(current_user)
     check_user = db.query(models.User).filter(models.User.email == current_user['email']).first()
     if check_user is None:
         raise HTTPException(status_code=403, detail="not allowed")
@@ -127,3 +129,46 @@ async def find_conversations(token: Annotated[str, Depends(oauth2_scheme)], db: 
     for e in db.query(models.Conversation).filter(models.Conversation.user_id == check_user.id):
         conversations_list.append(e)
     return conversations_list
+
+
+@app.get('/conversations/{conversation_id}/messages', dependencies=[Depends(JWTBearer())],
+         status_code=status.HTTP_201_CREATED)
+async def find_conversations_messages(conversation_id: int, token: Annotated[str, Depends(oauth2_scheme)],
+                                      db: db_dependency):
+    current_user = decode_jwt(token)
+    check_user = db.query(models.User).filter(models.User.email == current_user['email']).first()
+    if check_user is None:
+        raise HTTPException(status_code=403, detail="not allowed")
+    check_conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == conversation_id and models.Conversation.user_id == check_user.id).first()
+    if check_conversation is None or check_conversation.user_id != check_user.id:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    conversations_messages_list = []
+    for e in db.query(models.Message).filter(models.Message.conversation_id == conversation_id):
+        conversations_messages_list.append(e)
+    return conversations_messages_list
+
+
+@app.post('/conversations/{conversation_id}/messages', dependencies=[Depends(JWTBearer())],
+          status_code=status.HTTP_201_CREATED)
+async def create_conversations_messages(conversation_id: int, createMessageDto: CreateMessageDto,
+                                        token: Annotated[str, Depends(oauth2_scheme)],
+                                        db: db_dependency):
+    current_user = decode_jwt(token)
+    check_user = db.query(models.User).filter(models.User.email == current_user['email']).first()
+    if check_user is None:
+        raise HTTPException(status_code=403, detail="not allowed")
+    check_conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == conversation_id and models.Conversation.user_id == check_user.id).first()
+    if check_conversation is None or check_conversation.user_id != check_user.id:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    createMessageData = {
+        "message": createMessageDto.message,
+        "sender": "user",  # in case system response will be system
+        "conversation_id": conversation_id
+    }
+    db_message = models.Message(**createMessageData)
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+    return db_message
