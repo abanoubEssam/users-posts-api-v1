@@ -109,5 +109,7 @@ async def find_conversations(token: Annotated[str, Depends(oauth2_scheme)], db: 
     check_user = db.query(models.User).filter(models.User.email == current_user['email']).first()
     if check_user is None:
         raise HTTPException(status_code=403, detail="not allowed")
-    conversations_list = db.query(models.Conversation).all()
+    conversations_list = []
+    for e in db.query(models.Conversation).filter(models.Conversation.user_id == check_user.id):
+        conversations_list.append(e)
     return conversations_list
