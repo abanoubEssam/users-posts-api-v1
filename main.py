@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from typing import Union, Annotated
 from fastapi.security import OAuth2PasswordBearer
 
@@ -144,7 +145,7 @@ async def find_conversations_messages(conversation_id: int, token: Annotated[str
     if check_conversation is None or check_conversation.user_id != check_user.id:
         raise HTTPException(status_code=404, detail="conversation not found")
     conversations_messages_list = []
-    for e in db.query(models.Message).filter(models.Message.conversation_id == conversation_id):
+    for e in db.query(models.Message).order_by(desc(models.Message.created_date)).filter(models.Message.conversation_id == conversation_id):
         conversations_messages_list.append(e)
     return conversations_messages_list
 
